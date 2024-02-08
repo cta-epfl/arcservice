@@ -132,7 +132,7 @@ def health():
         else:
             logger.error('service is unhealthy: %s', r.stdout)
             return 'Unhealthy!', 500
-    except requests.exceptions.ReadTimeout as e:
+    except subprocess.CalledProcessError as e:
         logger.error('service is unhealthy: %s', e)
         sentry_sdk.capture_exception(e)
         return 'Unhealthy!', 500
