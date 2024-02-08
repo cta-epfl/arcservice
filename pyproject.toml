@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "arcservice"
+version = "0.1.0"
+description = ""
+authors = ["Bastien Wermeille <bastien.wermeille@proton.me>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+requests = "^2.31.0"
+sentry-sdk = {extras = ["flask"], version = "^1.40.0"}
+importlib-metadata = "^7.0.0"
+flask-cors = "^4.0.0"
+
+[tool.poetry.group.jupyterhub.dependencies]
+jupyterhub = "^4.0.1"
+
+[tool.poetry.group.test]
+optional = true
+
+[tool.poetry.group.test.dependencies]
+pytest = "^7.3.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+arcservice = { callable = "arcservice.cli:main" }
