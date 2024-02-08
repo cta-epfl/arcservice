@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-from functools import wraps
 import os
 import re
 import requests
@@ -7,10 +6,8 @@ import secrets
 import stat
 import subprocess
 import tempfile
-from urllib.parse import urlparse
-import xml.etree.ElementTree as ET
 import importlib.metadata
-from flask import Flask, request
+from flask import Flask
 from flask_cors import CORS
 
 import logging
@@ -67,18 +64,6 @@ def create_app():
 
     app.config['CTACS_URL'] = os.getenv('CTACS_URL', '')
 
-    app.config['CTADS_UPSTREAM_ENDPOINT'] = \
-        os.getenv('CTADS_UPSTREAM_ENDPOINT',
-                  'https://dcache.cta.cscs.ch:2880/')
-    app.config['CTADS_UPSTREAM_BASEPATH'] = \
-        os.getenv('CTADS_UPSTREAM_BASEPATH', 'pnfs/cta.cscs.ch/')
-    app.config['CTADS_UPSTREAM_BASEPATH'] = \
-        os.getenv('CTADS_UPSTREAM_BASEPATH', 'pnfs/cta.cscs.ch/')
-    app.config['CTADS_UPSTREAM_BASEFOLDER'] = \
-        os.getenv('CTADS_UPSTREAM_BASEFOLDER', 'lst')
-    app.config['CTADS_DISABLE_ALL_AUTH'] = \
-        os.getenv('CTADS_DISABLE_ALL_AUTH', 'False') == 'True'
-
     return app
 
 
@@ -129,7 +114,8 @@ def health():
     # Find another way to check without any token
 
     # TODO: Use certificate from certificate service
-    # with get_shared_certificate('shared::certificate') as (cert_file, cabundle_file):
+    # with get_shared_certificate('shared::certificate')
+    #      as (cert_file, cabundle_file):
     try:
         r = subprocess.run(['ls', '-l'], stdout=subprocess.PIPE)
         arcinfo = subprocess.check_output(["arcinfo", "-l"]).strip()

@@ -1,5 +1,4 @@
 import pytest
-import tempfile
 
 
 @pytest.fixture(scope="session")
