@@ -128,11 +128,14 @@ def health():
 
         # TODO: Check result
         if r.stdout:
-            return 'OK - ArcInfo with configured shared certificated is responding', 200
+            return 'OK - ArcInfo with configured shared certificated is ' + \
+                'responding', 200
         else:
             logger.error('service is unhealthy: %s', r.stdout)
-            return 'Unhealthy! - ArcInfo fails with configured shared certificate', 500
+            return 'Unhealthy! - ArcInfo fails with configured shared ' + \
+                'certificate', 500
     except subprocess.CalledProcessError as e:
         logger.error('service is unhealthy: %s', e)
         sentry_sdk.capture_exception(e)
-        return 'Unhealthy! - ArcInfo fails with configured shared certificate', 500
+        return 'Unhealthy! - ArcInfo fails with configured shared ' + \
+            'certificate', 500
