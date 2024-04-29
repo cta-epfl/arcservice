@@ -734,13 +734,13 @@ files = [
 
 [[package]]
 name = "pluggy"
-version = "1.4.0"
+version = "1.5.0"
 description = "plugin and hook calling mechanisms for python"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pluggy-1.4.0-py3-none-any.whl", hash = "sha256:7db9f7b503d67d1c5b95f59773ebb58a8c1c288129a88665838012cfb07b8981"},
-    {file = "pluggy-1.4.0.tar.gz", hash = "sha256:8c85c2876142a764e5b7548e7d9a0e0ddb46f5185161049a79b7e974454223be"},
+    {file = "pluggy-1.5.0-py3-none-any.whl", hash = "sha256:44e1ad92c8ca002de6377e165f3e0f1be63266ab4d554740532335b9d75ea669"},
+    {file = "pluggy-1.5.0.tar.gz", hash = "sha256:2cffa88e94fdc978c4c574f15f9e59b7f4201d439195c3715ca9e2486f1d0cf1"},
 ]
 
 [package.extras]
@@ -820,13 +820,13 @@ test = ["pretend", "pytest (>=3.0.1)", "pytest-rerunfailures"]
 
 [[package]]
 name = "pytest"
-version = "8.1.1"
+version = "8.2.0"
 description = "pytest: simple powerful testing with Python"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pytest-8.1.1-py3-none-any.whl", hash = "sha256:2a8386cfc11fa9d2c50ee7b2a57e7d898ef90470a7a34c4b949ff59662bb78b7"},
-    {file = "pytest-8.1.1.tar.gz", hash = "sha256:ac978141a75948948817d360297b7aae0fcb9d6ff6bc9ec6d514b85d5a65c044"},
+    {file = "pytest-8.2.0-py3-none-any.whl", hash = "sha256:1733f0620f6cda4095bbf0d9ff8022486e91892245bb9e7d5542c018f612f233"},
+    {file = "pytest-8.2.0.tar.gz", hash = "sha256:d507d4482197eac0ba2bae2e9babf0672eb333017bcedaa5fb1a3d42c1174b3f"},
 ]
 
 [package.dependencies]
@@ -834,11 +834,11 @@ colorama = {version = "*", markers = "sys_platform == \"win32\""}
 exceptiongroup = {version = ">=1.0.0rc8", markers = "python_version < \"3.11\""}
 iniconfig = "*"
 packaging = "*"
-pluggy = ">=1.4,<2.0"
+pluggy = ">=1.5,<2.0"
 tomli = {version = ">=1", markers = "python_version < \"3.11\""}
 
 [package.extras]
-testing = ["argcomplete", "attrs (>=19.2)", "hypothesis (>=3.56)", "mock", "pygments (>=2.7.2)", "requests", "setuptools", "xmlschema"]
+dev = ["argcomplete", "attrs (>=19.2)", "hypothesis (>=3.56)", "mock", "pygments (>=2.7.2)", "requests", "setuptools", "xmlschema"]
 
 [[package]]
 name = "pytest-flask"
@@ -1121,13 +1121,13 @@ files = [
 
 [[package]]
 name = "sentry-sdk"
-version = "1.45.0"
+version = "2.0.1"
 description = "Python client for Sentry (https://sentry.io)"
 optional = false
-python-versions = "*"
+python-versions = ">=3.6"
 files = [
-    {file = "sentry-sdk-1.45.0.tar.gz", hash = "sha256:509aa9678c0512344ca886281766c2e538682f8acfa50fd8d405f8c417ad0625"},
-    {file = "sentry_sdk-1.45.0-py2.py3-none-any.whl", hash = "sha256:1ce29e30240cc289a027011103a8c83885b15ef2f316a60bcc7c5300afa144f1"},
+    {file = "sentry_sdk-2.0.1-py2.py3-none-any.whl", hash = "sha256:b54c54a2160f509cf2757260d0cf3885b608c6192c2555a3857e3a4d0f84bdb3"},
+    {file = "sentry_sdk-2.0.1.tar.gz", hash = "sha256:c278e0f523f6f0ee69dc43ad26dcdb1202dffe5ac326ae31472e012d941bee21"},
 ]
 
 [package.dependencies]
@@ -1135,7 +1135,7 @@ blinker = {version = ">=1.1", optional = true, markers = "extra == \"flask\""}
 certifi = "*"
 flask = {version = ">=0.11", optional = true, markers = "extra == \"flask\""}
 markupsafe = {version = "*", optional = true, markers = "extra == \"flask\""}
-urllib3 = {version = ">=1.26.11", markers = "python_version >= \"3.6\""}
+urllib3 = ">=1.26.11"
 
 [package.extras]
 aiohttp = ["aiohttp (>=3.5)"]
@@ -1376,4 +1376,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "e2c759efb7527f480e27db12420b3cdf48232deb6e9b27bb4fce6aeddd771712"
+content-hash = "33cc73b7374f69b462a3fec2f119eff759f6102e06155e0de02108b3d943fd97"
