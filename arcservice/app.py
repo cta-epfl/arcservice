@@ -89,7 +89,11 @@ def get_shared_certificate(user=None):
 
         r = requests.get(
             urljoin_multipart(os.environ['CTACS_URL'], '/certificate'),
-            params={'service-token': service_token, 'user': username})
+            params={
+                'service-token': service_token,
+                'user': username,
+                'certificate_key': 'arc',
+            })
 
         if r.status_code != 200:
             logger.error(
