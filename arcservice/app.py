@@ -252,6 +252,10 @@ def get_arcinfo_json():
     # return arcinfo
     
 
+@app.route(url_prefix + '/metrics')
+def metrics():
+    return get_arcinfo_json(), 200
+
 
 @app.route(url_prefix + '/health')
 def health():
@@ -277,3 +281,5 @@ def health():
         sentry_sdk.capture_exception(e)
         return 'Unhealthy! - ArcInfo fails with configured shared ' + \
             'certificate', 500
+
+
