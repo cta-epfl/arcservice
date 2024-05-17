@@ -126,8 +126,8 @@ def parse_tabbed_output(output, levels=None):
     lines = output.splitlines()
 
 
-    logger.info(f"\033[32m {'.'.join(levels)}\033[0m parse_tabbed_output:")
-    logger.info("\n%s", "\n".join([">>> "+ l for l in lines]))
+    logger.debug(f"\033[32m {'.'.join(levels)}\033[0m parse_tabbed_output:")
+    logger.debug("\n%s", "\n".join([">>> "+ l for l in lines]))
 
     result = {}
     key = None
@@ -139,7 +139,7 @@ def parse_tabbed_output(output, levels=None):
         # print(f"{len(lines):3d}:{line}")
         if re.match(r"^[a-zA-Z]", line):
             if ":" not in line:
-                logger.info("skipping non-: line %s", line)
+                logger.debug("skipping non-: line %s", line)
                 continue
 
             key, value = line.split(":", 1)
@@ -148,18 +148,18 @@ def parse_tabbed_output(output, levels=None):
 
             if value.strip() != "":
                 value = value.strip()
-                logger.info("key %s value %s", key, value)
+                logger.debug("key %s value %s", key, value)
             else:
-                logger.info("starting block %s", key)
+                logger.debug("starting block %s", key)
                 suboutput_lines = []
                 while lines:
                     line = lines.pop(0)
-                    logger.info(f"{len(lines):3d}:{line}")
+                    logger.debug(f"{len(lines):3d}:{line}")
                     if re.match(r"^[0-9]", line):
                         line = lines.pop(0)
 
                     if re.match(r"^[a-zA-Z]", line):
-                        logger.info("break")
+                        logger.debug("break")
                         lines.insert(0, line)
                         break
                     
@@ -177,12 +177,12 @@ def parse_tabbed_output(output, levels=None):
                 else:
                     key = key + "_x"
 
-                logger.info("key exists %s", key)
+                logger.debug("key exists %s", key)
 
-            logger.info("\033[31mkey %s\033[0m", key)
+            logger.debug("\033[31mkey %s\033[0m", key)
             result[key] = value
         else:
-            logger.info("skipping line \'%s\'", line)
+            logger.debug("skipping line \'%s\'", line)
 
     return result
             
