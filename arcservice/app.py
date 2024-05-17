@@ -243,7 +243,20 @@ def get_arcinfo_json(metrics=True):
 
     if metrics:
         # return prometheus format
-        return "\n".join([f'arcservice_{k}{{label="arc"}} {v}' for k, v in flat_result.items()])
+
+        r = []
+
+        for k, v in flat_result.items():
+            # if v.endswith("Gb"):
+
+            try:
+                v = float(v)
+            except ValueError:
+                continue
+
+            r.append(f'arcservice_{k}{{label="arc"}} {v}')
+
+        return "\n".join(r)
         
     else:
         return flatten_dict(result)
