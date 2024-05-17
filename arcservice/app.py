@@ -208,8 +208,8 @@ def flatten_dict(d, parent_key='', sep='_'):
 
 def get_arcinfo_json():
     env = os.environ.copy()
-    # if 'X509_USER_PROXY' not in env:
-    #     env['X509_USER_PROXY'] = "/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt"
+    if 'X509_USER_PROXY' not in env:
+        env['X509_USER_PROXY'] = "/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt"
 
     result = {}
 
@@ -219,7 +219,7 @@ def get_arcinfo_json():
     try:
         arcstat = json.loads(
             "{" + subprocess.check_output([
-                "bash", "-c", "X509_USER_PROXY=/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt arcstat -a -J -l | grep -v WARN"
+                "bash", "-c", "arcstat -a -J -l | grep -v WARN"
                 # "bash", "-c", "kubectl exec -it  deployment/hub -n jh-system -- bash -c 'X509_USER_PROXY=/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt arcstat -a -J -l' | grep -v WARN"
                 ], env=env).strip().decode() + "}"
             )
