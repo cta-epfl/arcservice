@@ -206,7 +206,7 @@ def flatten_dict(d, parent_key='', sep='_'):
 
 
 
-def get_arcinfo_json():
+def get_arcinfo_json(metrics=True):
     env = os.environ.copy()
     if 'X509_USER_PROXY' not in env:
         env['X509_USER_PROXY'] = "/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt"
@@ -214,7 +214,7 @@ def get_arcinfo_json():
     result = {}
 
     arcinfo_output = subprocess.check_output(["arcinfo", "-l"], env=env).strip().decode()
-    result["arcinfo"] = parse_tabbed_output(arcinfo_output)
+    result["info"] = parse_tabbed_output(arcinfo_output)
 
     try:
         arcstat = json.loads(
@@ -226,11 +226,11 @@ def get_arcinfo_json():
     except subprocess.CalledProcessError as e:
         arcstat = {"jobs": "error"}
     
-    result["arcstat_njobs"] = len(arcstat["jobs"])
+    result["njobs"] = len(arcstat["jobs"])
 
     psarc = subprocess.check_output(["bash", "-c", "ps aux | grep arc-h"]).strip().decode().split("\n")
 
-    result["psarc_n"] = len(psarc)
+    result["psn"] = len(psarc)
 
     # kubectl exec -it  deployment/hub -n jh-system -- bash -c 'X509_USER_PROXY=/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt arcstat -a -J -l'
 
@@ -239,7 +239,14 @@ def get_arcinfo_json():
     # certificate number and validity
     # dcache space?
 
-    return flatten_dict(result)
+    flat_result = flatten_dict(result)
+
+    if metrics:
+        # return prometheus format
+        return "\n".join([f"arcservice_{k} {v}" for k, v in flat_result.items()])
+        
+    else:
+        return flatten_dict(result)
 
     # arcinfo = dict(
     #     free_slots=int(
