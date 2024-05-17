@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import json
 import os
 import re
 import requests
@@ -16,27 +17,32 @@ import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 
 
+try:
+    __version__ = importlib.metadata.version('arcservice')
+except importlib.metadata.PackageNotFoundError:
+    __version__ = 'unknown'
+
 class CertificateError(Exception):
     def __init__(self, message="invalid certificate"):
         self.message = message
         super().__init__(self.message)
 
 
-sentry_sdk.init(
-    dsn='https://452458c2a6630292629364221bff0dee@o4505709665976320' +
-        '.ingest.sentry.io/4505709666762752',
-    integrations=[
-        FlaskIntegration(),
-    ],
+# sentry_sdk.init(
+#     dsn='https://452458c2a6630292629364221bff0dee@o4505709665976320' +
+#         '.ingest.sentry.io/4505709666762752',
+#     integrations=[
+#         FlaskIntegration(),
+#     ],
 
-    # Set traces_sample_rate to 1.0 to capture 100%
-    # of transactions for performance monitoring.
-    # We recommend adjusting this value in production.
-    traces_sample_rate=1.0,
+#     # Set traces_sample_rate to 1.0 to capture 100%
+#     # of transactions for performance monitoring.
+#     # We recommend adjusting this value in production.
+#     traces_sample_rate=1.0,
 
-    release='arcservice:' + importlib.metadata.version("arcservice"),
-    environment=os.environ.get('SENTRY_ENVIRONMENT', 'dev'),
-)
+#     release='arcservice:' + __version__,
+#     environment=os.environ.get('SENTRY_ENVIRONMENT', 'dev'),
+# )
 
 # from flask_oidc import OpenIDConnect
 logger = logging.getLogger(__name__)
@@ -113,6 +119,140 @@ def get_shared_certificate(user=None):
         yield cert_file, cabundle_file
 
 
+def parse_tabbed_output(output, levels=None):
+    if levels is None:
+        levels = []
+
+    lines = output.splitlines()
+
+
+    logger.info(f"\033[32m {'.'.join(levels)}\033[0m parse_tabbed_output:")
+    logger.info("\n%s", "\n".join([">>> "+ l for l in lines]))
+
+    result = {}
+    key = None
+
+    while lines:
+        line = lines.pop(0)
+        line = re.sub(r"\(.*?\)", "", line)
+        
+        # print(f"{len(lines):3d}:{line}")
+        if re.match(r"^[a-zA-Z]", line):
+            if ":" not in line:
+                logger.info("skipping non-: line %s", line)
+                continue
+
+            key, value = line.split(":", 1)
+            key = re.sub("[^a-z0-9]+", "_", key.strip().lower())
+            # print(key, value)
+
+            if value.strip() != "":
+                value = value.strip()
+                logger.info("key %s value %s", key, value)
+            else:
+                logger.info("starting block %s", key)
+                suboutput_lines = []
+                while lines:
+                    line = lines.pop(0)
+                    logger.info(f"{len(lines):3d}:{line}")
+                    if re.match(r"^[0-9]", line):
+                        line = lines.pop(0)
+
+                    if re.match(r"^[a-zA-Z]", line):
+                        logger.info("break")
+                        lines.insert(0, line)
+                        break
+                    
+                    suboutput_lines.append(line[2:])
+
+                value = parse_tabbed_output("\n".join(suboutput_lines), list(levels) + [key])
+
+            if isinstance(value, dict) and "name" in value:
+                key = key + "_" + re.sub("[^a-z0-9]+", "_", value.get("name").strip().lower())
+                
+
+            while key in result:
+                if isinstance(value, dict):
+                    key = key + "_" + value.get("name", "x")
+                else:
+                    key = key + "_x"
+
+                logger.info("key exists %s", key)
+
+            logger.info("\033[31mkey %s\033[0m", key)
+            result[key] = value
+        else:
+            logger.info("skipping line \'%s\'", line)
+
+    return result
+            
+
+# kubectl exec -it  deployment/hub -n jh-system -- bash -c 'X509_USER_PROXY=/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt arcstat -a -J -l'
+
+def flatten_dict(d, parent_key='', sep='_'):
+    items = []
+    for k, v in d.items():
+        new_key = parent_key + sep + k if parent_key else k
+
+        if isinstance(v, list):
+            v = {str(_i): _v for _i, _v in enumerate(v)}
+
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())        
+        else:
+            items.append((new_key, v))
+
+    return dict(items)
+
+
+
+def get_arcinfo_json():
+    env = os.environ.copy()
+    # if 'X509_USER_PROXY' not in env:
+    #     env['X509_USER_PROXY'] = "/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt"
+
+    result = {}
+
+    arcinfo_output = subprocess.check_output(["arcinfo", "-l"], env=env).strip().decode()
+    result["arcinfo"] = parse_tabbed_output(arcinfo_output)
+
+    try:
+        arcstat = json.loads(
+            "{" + subprocess.check_output([
+                "bash", "-c", "X509_USER_PROXY=/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt arcstat -a -J -l | grep -v WARN"
+                # "bash", "-c", "kubectl exec -it  deployment/hub -n jh-system -- bash -c 'X509_USER_PROXY=/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt arcstat -a -J -l' | grep -v WARN"
+                ], env=env).strip().decode() + "}"
+            )
+    except subprocess.CalledProcessError as e:
+        arcstat = {"jobs": "error"}
+    
+    result["arcstat_njobs"] = len(arcstat["jobs"])
+
+    psarc = subprocess.check_output(["bash", "-c", "ps aux | grep arc-h"]).strip().decode().split("\n")
+
+    result["psarc_n"] = len(psarc)
+
+    # kubectl exec -it  deployment/hub -n jh-system -- bash -c 'X509_USER_PROXY=/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt arcstat -a -J -l'
+
+    # add arcstat
+    # add ps aux
+    # certificate number and validity
+    # dcache space?
+
+    return flatten_dict(result)
+
+    # arcinfo = dict(
+    #     free_slots=int(
+    #         re.search(r"Free slots: ([0-9]*)", arcinfo_output.decode()).group(1)),
+    #     total_slots=int(
+    #         re.search(r"Total slots: ([0-9]*)",
+    #                     arcinfo.decode()).group(1)),
+    # )
+
+    # return arcinfo
+    
+
+
 @app.route(url_prefix + '/health')
 def health():
     # Find another way to check without any token
@@ -121,23 +261,17 @@ def health():
     # with get_shared_certificate('shared::certificate')
     #      as (cert_file, cabundle_file):
     try:
-        r = subprocess.run(['ls', '-l'], stdout=subprocess.PIPE)
-        arcinfo = subprocess.check_output(["arcinfo", "-l"]).strip()
-        arcinfo = dict(
-            free_slots=int(
-                re.search(r"Free slots: ([0-9]*)", arcinfo.decode()).group(1)),
-            total_slots=int(
-                re.search(r"Total slots: ([0-9]*)",
-                          arcinfo.decode()).group(1)),)
+        return get_arcinfo_json()
+
 
         # TODO: Check result
-        if r.stdout:
-            return 'OK - ArcInfo with configured shared certificated is ' + \
-                'responding', 200
-        else:
-            logger.error('service is unhealthy: %s', r.stdout)
-            return 'Unhealthy! - ArcInfo fails with configured shared ' + \
-                'certificate', 500
+        # if r.stdout:
+        #     return 'OK - ArcInfo with configured shared certificated is ' + \
+        #         'responding', 200
+        # else:
+        #     logger.error('service is unhealthy: %s', r.stdout)
+        #     return 'Unhealthy! - ArcInfo fails with configured shared ' + \
+        #         'certificate', 500
     except subprocess.CalledProcessError as e:
         logger.error('service is unhealthy: %s', e)
         sentry_sdk.capture_exception(e)
