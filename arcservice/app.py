@@ -243,7 +243,7 @@ def get_arcinfo_json(metrics=True):
 
     if metrics:
         # return prometheus format
-        return "\n".join([f"arcservice_{k} {v}" for k, v in flat_result.items()])
+        return "\n".join([f'arcservice_{k}{{label="arc"}} {v}' for k, v in flat_result.items()])
         
     else:
         return flatten_dict(result)
