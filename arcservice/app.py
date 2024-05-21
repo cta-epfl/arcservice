@@ -22,6 +22,7 @@ try:
 except importlib.metadata.PackageNotFoundError:
     __version__ = 'unknown'
 
+
 class CertificateError(Exception):
     def __init__(self, message="invalid certificate"):
         self.message = message
@@ -125,9 +126,8 @@ def parse_tabbed_output(output, levels=None):
 
     lines = output.splitlines()
 
-
     logger.debug(f"\033[32m {'.'.join(levels)}\033[0m parse_tabbed_output:")
-    logger.debug("\n%s", "\n".join([">>> "+ l for l in lines]))
+    logger.debug("\n%s", "\n".join([">>> " + l for l in lines]))
 
     result = {}
     key = None
@@ -135,7 +135,7 @@ def parse_tabbed_output(output, levels=None):
     while lines:
         line = lines.pop(0)
         line = re.sub(r"\(.*?\)", "", line)
-        
+
         # print(f"{len(lines):3d}:{line}")
         if re.match(r"^[a-zA-Z]", line):
             if ":" not in line:
@@ -162,14 +162,17 @@ def parse_tabbed_output(output, levels=None):
                         logger.debug("break")
                         lines.insert(0, line)
                         break
-                    
+
                     suboutput_lines.append(line[2:])
 
-                value = parse_tabbed_output("\n".join(suboutput_lines), list(levels) + [key])
+                value = parse_tabbed_output(
+                    "\n".join(suboutput_lines),
+                    list(levels) + [key])
 
             if isinstance(value, dict) and "name" in value:
-                key = key + "_" + re.sub("[^a-z0-9]+", "_", value.get("name").strip().lower())
-                
+                key = key + "_" + re.sub("[^a-z0-9]+",
+                                         "_",
+                                         value.get("name").strip().lower())
 
             while key in result:
                 if isinstance(value, dict):
@@ -185,7 +188,7 @@ def parse_tabbed_output(output, levels=None):
             logger.debug("skipping line \'%s\'", line)
 
     return result
-            
+
 
 # kubectl exec -it  deployment/hub -n jh-system -- bash -c 'X509_USER_PROXY=/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt arcstat -a -J -l'
 
@@ -198,22 +201,23 @@ def flatten_dict(d, parent_key='', sep='_'):
             v = {str(_i): _v for _i, _v in enumerate(v)}
 
         if isinstance(v, dict):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())        
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
         else:
             items.append((new_key, v))
 
     return dict(items)
 
 
-
 def get_arcinfo_json(metrics=True):
     env = os.environ.copy()
     if 'X509_USER_PROXY' not in env:
-        env['X509_USER_PROXY'] = "/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt"
+        env['X509_USER_PROXY'] = \
+            "/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt"
 
     result = {}
 
-    arcinfo_output = subprocess.check_output(["arcinfo", "-l"], env=env).strip().decode()
+    arcinfo_output = subprocess.check_output(
+        ["arcinfo", "-l"], env=env).strip().decode()
     result["info"] = parse_tabbed_output(arcinfo_output)
 
     try:
@@ -221,14 +225,15 @@ def get_arcinfo_json(metrics=True):
             "{" + subprocess.check_output([
                 "bash", "-c", "arcstat -a -J -l | grep -v WARN"
                 # "bash", "-c", "kubectl exec -it  deployment/hub -n jh-system -- bash -c 'X509_USER_PROXY=/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt arcstat -a -J -l' | grep -v WARN"
-                ], env=env).strip().decode() + "}"
-            )
+            ], env=env).strip().decode() + "}"
+        )
     except subprocess.CalledProcessError as e:
         arcstat = {"jobs": "error"}
-    
+
     result["njobs"] = len(arcstat["jobs"])
 
-    psarc = subprocess.check_output(["bash", "-c", "ps aux | grep arc-h"]).strip().decode().split("\n")
+    psarc = subprocess.check_output(
+        ["bash", "-c", "ps aux | grep arc-h"]).strip().decode().split("\n")
 
     result["psn"] = len(psarc)
 
@@ -257,7 +262,7 @@ def get_arcinfo_json(metrics=True):
             r.append(f'arcservice_{k}{{label="arc"}} {v}')
 
         return "\n".join(r)
-        
+
     else:
         return flatten_dict(result)
 
@@ -270,7 +275,7 @@ def get_arcinfo_json(metrics=True):
     # )
 
     # return arcinfo
-    
+
 
 @app.route(url_prefix + '/metrics')
 def metrics():
@@ -287,7 +292,6 @@ def health():
     try:
         return get_arcinfo_json()
 
-
         # TODO: Check result
         # if r.stdout:
         #     return 'OK - ArcInfo with configured shared certificated is ' + \
@@ -301,5 +305,3 @@ def health():
         sentry_sdk.capture_exception(e)
         return 'Unhealthy! - ArcInfo fails with configured shared ' + \
             'certificate', 500
-
-
