@@ -10,6 +10,8 @@ import tempfile
 import importlib.metadata
 from flask import Flask
 from flask_cors import CORS
+from collections import defaultdict
+from datetime import datetime, timedelta
 
 import logging
 
@@ -208,6 +210,72 @@ def flatten_dict(d, parent_key='', sep='_'):
     return dict(items)
 
 
+def stream_file_stats(cert_file=None):
+    token_var = 'JUPYTERHUB_API_TOKEN'
+    if cert_file and os.path.exists(cert_file):
+        session = requests.Session()
+        session.cert = cert_file
+    url = os.environ.get('CTADS_URL') + "/webdav/filelists/latest"
+    if token_var in os.environ:
+        headers = {'Authorization': 'Bearer ' + os.environ['JUPYTERHUB_API_TOKEN']}
+    else:
+        headers = {}
+
+    with requests.get(url, headers=headers, stream=True) as r:
+        r.raise_for_status()
+        for line in r.iter_lines():
+            yield line.decode("utf-8")
+
+
+def filelist_metrics(lines, last_period_h=24):
+    metrics = defaultdict(lambda: defaultdict(int))
+    path_prefix = '/pnfs/cta.cscs.ch/'
+    path_groups = ['lst', 'cta', 'dteam']
+    expected_header = 'isum,ipnfsid,path,isize,ictime,imtime,iatime,icrtime'
+    date_format = '%Y-%m-%d %H:%M:%S'
+    size_col = 3
+    time_col = 5  # imtime
+    path_col = 2
+
+    time_threshold = datetime.now() - timedelta(hours=last_period_h)
+
+    csv_header = str.strip(lines.__next__())
+    assert csv_header == expected_header
+
+    for line_no, line in enumerate(lines):
+        data = line.split(',')
+        path = data[path_col].strip()
+        folder = 'total'
+        if path.startswith(path_prefix):
+            _folder = path[len(path_prefix):].split('/')[0]
+            if _folder in path_groups:
+                folder = _folder
+
+        cur_metrics = metrics[folder]
+
+        data_size = int(data[size_col])
+        cur_metrics['data_size'] += data_size
+        cur_metrics['file_count'] += 1
+
+        try:
+            t = data[time_col].strip().split('.')[0]
+            t = datetime.strptime(t, date_format)
+        except ValueError as er:
+            logger.error(
+                f'Error while parsing file list : line { line_no + 1} : {er}')
+            continue
+
+        if t >= time_threshold:
+            cur_metrics['last_data_size'] += data_size
+            cur_metrics['last_file_count'] += 1
+
+    tot_metrics = metrics['total']
+    for folder in path_groups:
+        for k, v in metrics[folder].items():
+            tot_metrics[k] += v
+
+    return metrics
+
 def get_arcinfo_json(metrics=True):
     env = os.environ.copy()
     if 'X509_USER_PROXY' not in env:
@@ -236,6 +304,14 @@ def get_arcinfo_json(metrics=True):
         ["bash", "-c", "ps aux | grep arc-h"]).strip().decode().split("\n")
 
     result["psn"] = len(psarc)
+
+    # append file list metrics
+    try:
+        lines = stream_file_stats(cert_file=env['X509_USER_PROXY'])
+        result.update(filelist_metrics(lines))
+        result['file_list_status_code'] = 200
+    except requests.HTTPError as http_er:
+        result['file_list_status_code'] = http_er.request.status_code
 
     # kubectl exec -it  deployment/hub -n jh-system -- bash -c 'X509_USER_PROXY=/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt arcstat -a -J -l'
 
