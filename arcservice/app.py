@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 import logging
 
 import sentry_sdk
-from sentry_sdk.integrations.flask import FlaskIntegration
+# from sentry_sdk.integrations.flask import FlaskIntegration
 
 
 try:
@@ -129,7 +129,7 @@ def parse_tabbed_output(output, levels=None):
     lines = output.splitlines()
 
     logger.debug(f"\033[32m {'.'.join(levels)}\033[0m parse_tabbed_output:")
-    logger.debug("\n%s", "\n".join([">>> " + l for l in lines]))
+    logger.debug("\n%s", "\n".join([">>> " + line for line in lines]))
 
     result = {}
     key = None
@@ -192,8 +192,6 @@ def parse_tabbed_output(output, levels=None):
     return result
 
 
-# kubectl exec -it  deployment/hub -n jh-system -- bash -c 'X509_USER_PROXY=/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt arcstat -a -J -l'
-
 def flatten_dict(d, parent_key='', sep='_'):
     items = []
     for k, v in d.items():
@@ -217,7 +215,8 @@ def stream_file_stats(cert_file=None):
         session.cert = cert_file
     url = os.environ.get('CTADS_URL') + "/webdav/filelists/latest"
     if token_var in os.environ:
-        headers = {'Authorization': 'Bearer ' + os.environ['JUPYTERHUB_API_TOKEN']}
+        headers = {'Authorization': 'Bearer ' +
+                                    os.environ['JUPYTERHUB_API_TOKEN']}
     else:
         headers = {}
 
@@ -276,6 +275,7 @@ def filelist_metrics(lines, last_period_h=24):
 
     return metrics
 
+
 def get_arcinfo_json(metrics=True):
     env = os.environ.copy()
     if 'X509_USER_PROXY' not in env:
@@ -292,10 +292,14 @@ def get_arcinfo_json(metrics=True):
         arcstat = json.loads(
             "{" + subprocess.check_output([
                 "bash", "-c", "arcstat -a -J -l | grep -v WARN"
-                # "bash", "-c", "kubectl exec -it  deployment/hub -n jh-system -- bash -c 'X509_USER_PROXY=/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt arcstat -a -J -l' | grep -v WARN"
+                # "bash", "-c", "kubectl exec -it  deployment/hub
+                # -n jh-system -- bash -c
+                # 'X509_USER_PROXY=/certificateservice-data/
+                # gitlab_ctao_volodymyr_savchenko__arc.crt
+                # arcstat -a -J -l' | grep -v WARN"
             ], env=env).strip().decode() + "}"
         )
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         arcstat = {"jobs": "error"}
 
     result["njobs"] = len(arcstat["jobs"])
@@ -313,7 +317,9 @@ def get_arcinfo_json(metrics=True):
     except requests.HTTPError as http_er:
         result['file_list_status_code'] = http_er.request.status_code
 
-    # kubectl exec -it  deployment/hub -n jh-system -- bash -c 'X509_USER_PROXY=/certificateservice-data/gitlab_ctao_volodymyr_savchenko__arc.crt arcstat -a -J -l'
+    # kubectl exec -it  deployment/hub -n jh-system -- bash -c
+    # 'X509_USER_PROXY=/certificateservice-data/
+    # gitlab_ctao_volodymyr_savchenko__arc.crt arcstat -a -J -l'
 
     # add arcstat
     # add ps aux
@@ -344,7 +350,8 @@ def get_arcinfo_json(metrics=True):
 
     # arcinfo = dict(
     #     free_slots=int(
-    #         re.search(r"Free slots: ([0-9]*)", arcinfo_output.decode()).group(1)),
+    #         re.search(r"Free slots: ([0-9]*)",
+    #                   arcinfo_output.decode()).group(1)),
     #     total_slots=int(
     #         re.search(r"Total slots: ([0-9]*)",
     #                     arcinfo.decode()).group(1)),
