@@ -311,7 +311,9 @@ def get_arcinfo_json(metrics=True):
 
     # append file list metrics
     try:
-        lines = stream_file_stats(cert_file=env['X509_USER_PROXY'])
+        # cert_file = env['X509_USER_PROXY']
+        cert_file = "/certificateservice-data/gitlab_ctao_volodymyr_savchenko__lst.crt"
+        lines = stream_file_stats(cert_file=cert_file)
         result.update(filelist_metrics(lines))
         result['file_list_status_code'] = 200
     except requests.HTTPError as http_er:
