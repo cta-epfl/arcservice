@@ -217,25 +217,28 @@ def refresh_oidc_token():
     if client_secret is None:
         logger.error('DCACHE_CLIENT_SECRET env var is not set')
         return None
-    token_url = 'https://keycloak.cta.cscs.ch/realms/master/protocol/openid-connect/token'
+    token_url = \
+        'https://keycloak.cta.cscs.ch/realms/master/protocol/openid-connect/token'
     data = {
-    'grant_type': 'refresh_token',
-    'client_id': "dcache-cta-cscs-ch-users",
-    'client_secret': client_secret,
-    'refresh_token': refresh_token
+        'grant_type': 'refresh_token',
+        'client_id': "dcache-cta-cscs-ch-users",
+        'client_secret': client_secret,
+        'refresh_token': refresh_token
     }
     response = requests.post(token_url, data=data)
     new_access_token = None
     if response.status_code == 200:
         token_data = response.json()
         new_access_token = token_data.get('access_token')
-        
+
         # Optional: sometimes a new refresh token is returned
         new_refresh_token = token_data.get('refresh_token')
         if new_refresh_token:
             os.environ['DCACHE_REFRESH_TOKEN'] = new_refresh_token
     else:
-        logger.error(f"Error refreshing token: {response.status_code}\n{response.json()}")
+        logger.error(
+            f"Error refreshing token: {response.status_code}\n"
+            f"{response.json()}")
     return new_access_token
 
 
@@ -245,16 +248,17 @@ def stream_file_stats(cert_file=None):
     if cert_file and os.path.exists(cert_file):
         session = requests.Session()
         session.cert = cert_file
-    url = os.environ.get('DCACHE_URL','') + "/pnfs/cta.cscs.ch/filelists/latest"
+    url = os.environ.get('DCACHE_URL', '') + \
+        "/pnfs/cta.cscs.ch/filelists/latest"
     if token:
         headers = {'Authorization': 'Bearer ' + token
-                                    }
+                   }
     else:
         headers = {}
 
     ca_cert_dir = os.environ.get('CA_CERT_DIR', '')
     params = dict(headers=headers, stream=True)
-    
+
     if ca_cert_dir:
         params['verify'] = ca_cert_dir
 
@@ -299,7 +303,7 @@ def filelist_metrics(lines, last_period_h=24):
             t = datetime.strptime(t, date_format)
         except ValueError as er:
             logger.error(
-                f'Error while parsing file list : line { line_no + 1} : {er}')
+                f'Error while parsing file list : line {line_no + 1} : {er}')
             continue
 
         if t >= time_threshold:
@@ -350,8 +354,8 @@ def get_arcinfo_json(metrics=True):
     # append file list metrics
     try:
         # cert_file = env['X509_USER_PROXY']
-        #cert_file = \
-        #    "/certificateservice-data/gitlab_ctao_volodymyr_savchenko__lst.crt"
+        # cert_file = \
+        #   "/certificateservice-data/gitlab_ctao_volodymyr_savchenko__lst.crt"
         lines = stream_file_stats()
         result.update(filelist_metrics(lines))
         result['file_list_status_code'] = 200
