@@ -217,8 +217,8 @@ def refresh_oidc_token():
     if client_secret is None:
         logger.error('DCACHE_CLIENT_SECRET env var is not set')
         return None
-    token_url = \
-        'https://keycloak.cta.cscs.ch/realms/master/protocol/openid-connect/token'
+    token_url = "https://keycloak.cta.cscs.ch/realms/master/protocol" \
+        "/openid-connect/token"
     data = {
         'grant_type': 'refresh_token',
         'client_id': "dcache-cta-cscs-ch-users",
