@@ -208,19 +208,57 @@ def flatten_dict(d, parent_key='', sep='_'):
     return dict(items)
 
 
+def refresh_oidc_token():
+    refresh_token = os.environ.get('DCACHE_REFRESH_TOKEN', None)
+    client_secret = os.environ.get('DCACHE_CLIENT_SECRET', None)
+    if refresh_token is None:
+        logger.error('DCACHE_REFRESH_TOKEN env var is not set')
+        return None
+    if client_secret is None:
+        logger.error('DCACHE_CLIENT_SECRET env var is not set')
+        return None
+    token_url = 'https://keycloak.cta.cscs.ch/realms/master/protocol/openid-connect/token'
+    data = {
+    'grant_type': 'refresh_token',
+    'client_id': "dcache-cta-cscs-ch-users",
+    'client_secret': client_secret,
+    'refresh_token': refresh_token
+    }
+    response = requests.post(token_url, data=data)
+    new_access_token = None
+    if response.status_code == 200:
+        token_data = response.json()
+        new_access_token = token_data.get('access_token')
+        
+        # Optional: sometimes a new refresh token is returned
+        new_refresh_token = token_data.get('refresh_token')
+        if new_refresh_token:
+            os.environ['DCACHE_REFRESH_TOKEN'] = new_refresh_token
+    else:
+        logger.error(f"Error refreshing token: {response.status_code}\n{response.json()}")
+    return new_access_token
+
+
 def stream_file_stats(cert_file=None):
-    token_var = 'JUPYTERHUB_API_TOKEN'
+    # token = os.environ.get('JUPYTERHUB_API_TOKEN', '')
+    token = refresh_oidc_token()
     if cert_file and os.path.exists(cert_file):
         session = requests.Session()
         session.cert = cert_file
-    url = os.environ.get('CTADS_URL') + "/webdav/filelists/latest"
-    if token_var in os.environ:
-        headers = {'Authorization': 'Bearer ' +
-                                    os.environ['JUPYTERHUB_API_TOKEN']}
+    url = os.environ.get('DCACHE_URL','') + "/pnfs/cta.cscs.ch/filelists/latest"
+    if token:
+        headers = {'Authorization': 'Bearer ' + token
+                                    }
     else:
         headers = {}
 
-    with requests.get(url, headers=headers, stream=True) as r:
+    ca_cert_dir = os.environ.get('CA_CERT_DIR', '')
+    params = dict(headers=headers, stream=True)
+    
+    if ca_cert_dir:
+        params['verify'] = ca_cert_dir
+
+    with requests.get(url, **params) as r:
         r.raise_for_status()
         for line in r.iter_lines():
             yield line.decode("utf-8")
@@ -312,13 +350,15 @@ def get_arcinfo_json(metrics=True):
     # append file list metrics
     try:
         # cert_file = env['X509_USER_PROXY']
-        cert_file = \
-            "/certificateservice-data/gitlab_ctao_volodymyr_savchenko__lst.crt"
-        lines = stream_file_stats(cert_file=cert_file)
+        #cert_file = \
+        #    "/certificateservice-data/gitlab_ctao_volodymyr_savchenko__lst.crt"
+        lines = stream_file_stats()
         result.update(filelist_metrics(lines))
         result['file_list_status_code'] = 200
     except requests.HTTPError as http_er:
         result['file_list_status_code'] = http_er.request.status_code
+    except Exception as general_error:
+        logger.error(general_error)
 
     # kubectl exec -it  deployment/hub -n jh-system -- bash -c
     # 'X509_USER_PROXY=/certificateservice-data/
