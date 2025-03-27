@@ -211,6 +211,7 @@ def flatten_dict(d, parent_key='', sep='_'):
 def refresh_oidc_token():
     refresh_token = os.environ.get('DCACHE_REFRESH_TOKEN', None)
     client_secret = os.environ.get('DCACHE_CLIENT_SECRET', None)
+    client_id = os.environ.get('DCACHE_CLIENT_ID', "dcache-cta-cscs-ch-users")
     if refresh_token is None:
         logger.error('DCACHE_REFRESH_TOKEN env var is not set')
         return None
@@ -221,7 +222,7 @@ def refresh_oidc_token():
         "/openid-connect/token"
     data = {
         'grant_type': 'refresh_token',
-        'client_id': "dcache-cta-cscs-ch-users",
+        'client_id': client_id,
         'client_secret': client_secret,
         'refresh_token': refresh_token
     }
@@ -256,11 +257,11 @@ def stream_file_stats(cert_file=None):
     else:
         headers = {}
 
-    ca_cert_dir = os.environ.get('CA_CERT_DIR', '')
+    ca_cert = os.environ.get('CA_CERT', '')
     params = dict(headers=headers, stream=True)
 
-    if ca_cert_dir:
-        params['verify'] = ca_cert_dir
+    if ca_cert:
+        params['verify'] = ca_cert
 
     with requests.get(url, **params) as r:
         r.raise_for_status()
