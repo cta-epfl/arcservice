@@ -45,10 +45,10 @@ def certificates():
         "igtf-policy-installation-bundle-1.134.tar.gz"
     with tempfile.TemporaryDirectory() as temp_dir:
         destination_path = temp_dir + '/cert.tgz'
-        output_file = temp_dir + '/cert.pep'
+        output_file = temp_dir + '/cert.pem'
         download_file(cert_path, destination_path)
         shutil.unpack_archive(destination_path, temp_dir, format='gztar')
-        concatenate_files(glob.glob(temp_dir +
-                                    '/igtf-policy-installation-bundle-1.134/src/accredited/*.pem'),
-                          output_file)
+        search_path = '/**/*.pem'
+        files = list(glob.glob(temp_dir + search_path, recursive=True))
+        concatenate_files(files, output_file)
         yield output_file
