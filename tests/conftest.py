@@ -11,7 +11,6 @@ def app():
         "DEBUG": True,
         "SERVER_NAME": 'app',
     })
-
     yield app
 
 
@@ -32,9 +31,9 @@ def mock(access_token, refresh_token):
 
     os.environ['DCACHE_REFRESH_TOKEN'] = 'token'
     os.environ['DCACHE_CLIENT_SECRET'] = 'secret'
-    
+
     with requests_mock.Mocker() as mock:
         mock.post(token_url,
-              json={"access_token": access_token,
-                    refresh_token: refresh_token})
+                  json={"access_token": access_token,
+                        refresh_token: refresh_token})
         yield mock

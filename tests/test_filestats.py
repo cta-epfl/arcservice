@@ -1,4 +1,3 @@
-from typing import Any
 import os
 import io
 
@@ -29,7 +28,7 @@ def test_filestat(mock):
                          f"{file_size},2023-02-20 12:37:04.325,2023-02-20 "
                          "12:37:04.325,2023-02-20 12:37:04.18,2023-02-20 "
                          "12:37:04.18\n")
-            
+
     contents = buffer.getvalue()
     mock.get(file_url, content=contents.encode("utf-8"))
     lines = stream_file_stats()
@@ -37,4 +36,3 @@ def test_filestat(mock):
     assert metrics['lst']['file_count'] == n_files
     assert metrics['lst']['data_size'] == n_files * file_size
     assert metrics['total']['file_count'] == 4 * n_files
-    
