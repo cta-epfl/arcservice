@@ -1,26 +1,54 @@
 from typing import Any
-import pytest
 import os
-from arcservice.app import stream_file_stats, filelist_metrics
+import io
+
+from arcservice.app import (stream_file_stats, filelist_metrics,
+                            refresh_oidc_token)
 
 
-def test_filestat(certificates: Any):
-    os.environ['DCACHE_URL'] = 'https://dcache-dev.ctaodc.ch:2880'
-    os.environ['DCACHE_CLIENT_ID'] = 'dcache-dev'
-    os.environ['CA_CERT'] = certificates
-    os.environ['DCACHE_REFRESH_TOKEN'] = "eyJhbGciOiJIUzUxMiIsInR5cCIgOiAiSl" \
-        "dUIiwia2lkIiA6ICJhOWFiNTBhOS1hMGFjLTRkZDAtYWVhMS00YzZlOWUzZWE5YWEif" \
-        "Q.eyJpYXQiOjE3NDMwODM3MzYsImp0aSI6IjMzMzlkZjY3LWRjOGItNGRlNS05YjM0L" \
-        "TA2MThkYjA5ODYwZiIsImlzcyI6Imh0dHBzOi8va2V5Y2xvYWsuY3RhLmNzY3MuY2gv" \
-        "cmVhbG1zL21hc3RlciIsImF1ZCI6Imh0dHBzOi8va2V5Y2xvYWsuY3RhLmNzY3MuY2g" \
-        "vcmVhbG1zL21hc3RlciIsInN1YiI6IjJiZTlkYjc1LWE3ZTEtNGI3Yi1iN2JjLTYxYT" \
-        "AzMmM3NzQ4MCIsInR5cCI6Ik9mZmxpbmUiLCJhenAiOiJkY2FjaGUtZGV2Iiwic2Vzc" \
-        "2lvbl9zdGF0ZSI6IjFiNjJmZjIwLWUzYzgtNGJhOS1iZTA5LTgxYjU1MGFiZjNjMSIs" \
-        "InNjb3BlIjoib3BlbmlkIG9mZmxpbmVfYWNjZXNzIHByb2ZpbGUgZW1haWwgY3RhbyI" \
-        "sInNpZCI6IjFiNjJmZjIwLWUzYzgtNGJhOS1iZTA5LTgxYjU1MGFiZjNjMSJ9.gO9iY" \
-        "AoQzKLJHlGrwaxxd5PrXW8y1npXT5ywM7NayaqtPJ9ftrC4LrBD0d4BVVfzDEv3MIB5" \
-        "gyXBCUu0gSCXLg"
+def test_refresh_oidc_token(mock):
+    token_url = "https://keycloak.cta.cscs.ch/realms/master/protocol" \
+        "/openid-connect/token"
+    access_token = "access_token"
+    refresh_token = "refresh_token"
 
-    os.environ['DCACHE_CLIENT_SECRET'] = 'sedN6x92foO3AQfYw9HKfeqYZBm7kMQx'
+    os.environ['DCACHE_REFRESH_TOKEN'] = 'token'
+    os.environ['DCACHE_CLIENT_SECRET'] = 'secret'
+    mock.post(token_url,
+              json={"access_token": access_token,
+                    refresh_token: refresh_token})
+    new_access_token = refresh_oidc_token()
+
+    assert os.environ['DCACHE_REFRESH_TOKEN'] == refresh_token
+    assert new_access_token == access_token
+
+
+def test_filestat(mock):
+    token_url = "https://keycloak.cta.cscs.ch/realms/master/protocol" \
+        "/openid-connect/token"
+    access_token = "access_token"
+    refresh_token = "refresh_token"
+
+    os.environ['DCACHE_REFRESH_TOKEN'] = 'token'
+    os.environ['DCACHE_CLIENT_SECRET'] = 'secret'
+    mock.post(token_url,
+              json={"access_token": access_token,
+                    refresh_token: refresh_token})
+
+    dcache_url = 'https://dcache-dev.ctaodc.ch:2880'
+    file_url = dcache_url + "/pnfs/cta.cscs.ch/filelists/latest"
+    os.environ['DCACHE_URL'] = dcache_url
+
+    # Create a string buffer
+    buffer = io.StringIO()
+    buffer.write("isum,ipnfsid,path,isize,ictime,imtime,iatime,icrtime")
+    for path_group in ['lst', 'cta', 'dteam', 'another']:
+        for _ in range(10):
+            buffer.write(f"413984,695984,/pnfs/cta.cscs.ch/{path_group}/"
+                         "673936,637640,2023-02-20 12:37:04.325,2023-02-20 "
+                         "12:37:04.325,2023-02-20 12:37:04.18,2023-02-20 "
+                         "12:37:04.18")
+
+    mock.get(file_url, content=str(buffer))
     lines = stream_file_stats()
     print(filelist_metrics(lines))
