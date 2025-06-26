@@ -327,9 +327,14 @@ def get_arcinfo_json(metrics=True):
 
     result = {}
 
-    arcinfo_output = subprocess.check_output(
-        ["arcinfo", "-l"], env=env).strip().decode()
-    result["info"] = parse_tabbed_output(arcinfo_output)
+    try:
+        arcinfo_output = subprocess.check_output(
+            ["arcinfo", "-l"], env=env).strip().decode()
+        result["info"] = parse_tabbed_output(arcinfo_output)
+        result['arcinfo_error'] = 0
+    except subprocess.CalledProcessError as arc_info_error:
+        result['arcinfo_error'] = arc_info_error.returncode
+        logger.error(arc_info_error)
 
     try:
         arcstat = json.loads(
