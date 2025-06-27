@@ -213,11 +213,21 @@ def refresh_oidc_token():
     client_secret = os.environ.get('DCACHE_CLIENT_SECRET', None)
     client_id = os.environ.get('DCACHE_CLIENT_ID', "dcache-cta-cscs-ch-users")
     if refresh_token is None:
-        logger.error('DCACHE_REFRESH_TOKEN env var is not set')
-        return None
+        token_path = os.environ.get("DCACHE_REFRESH_TOKEN_FILE")
+        if token_path and os.path.isfile(token_path):
+            with open(token_path) as f:
+                refresh_token = f.read().strip()
+        else:
+            logger.error('neither DCACHE_REFRESH_TOKEN or DCACHE_REFRESH_TOKEN_FILE envs are valid')
+            return None
     if client_secret is None:
-        logger.error('DCACHE_CLIENT_SECRET env var is not set')
-        return None
+        secret_path = os.environ.get("DCACHE_CLIENT_SECRET_FILE")
+        if secret_path and os.path.isfile(secret_path):
+            with open(secret_path) as f:
+                client_secret = f.read().strip()
+        else:
+            logger.error('neither DCACHE_CLIENT_SECRET or DCACHE_CLIENT_SECRET_FILE envs are valid')
+            return None
     token_url = "https://keycloak.cta.cscs.ch/realms/master/protocol" \
         "/openid-connect/token"
     data = {
