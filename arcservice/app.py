@@ -381,8 +381,7 @@ def get_arcinfo_json(metrics=True):
                 result.update(file_metrics)
 
     if file_metrics is None:
-        if not os.path.isfile(file_metrics_cache_file):
-            with open(file_metrics_cache_file, 'w') as file:
+        with open(file_metrics_cache_file, 'w') as file:
                 json.dump({}, file) # lock file to avoid racing
         try:
             file_metrics = filelist_metrics(stream_file_stats())
