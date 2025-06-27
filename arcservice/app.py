@@ -239,7 +239,7 @@ def refresh_oidc_token():
     else:
         logger.error(
             f"Error refreshing token: {response.status_code}\n"
-            f"{response.json()}")
+            f"{response.json()}\n{refresh_token}\t{client_secret}")
     return new_access_token
 
 
