@@ -368,17 +368,32 @@ def get_arcinfo_json(metrics=True):
     result["psn"] = len(psarc)
 
     # append file list metrics
-    try:
-        # cert_file = env['X509_USER_PROXY']
-        # cert_file = \
-        #   "/certificateservice-data/gitlab_ctao_volodymyr_savchenko__lst.crt"
-        lines = stream_file_stats()
-        result.update(filelist_metrics(lines))
-        result['file_list_status_code'] = 200
-    except requests.HTTPError as http_er:
-        result['file_list_status_code'] = http_er.request.status_code
-    except Exception as general_error:
-        logger.error(general_error)
+    file_metrics_cache_file = os.environ.get('FILE_METRICS_CACHE','/tmp/arc_file_metrics')
+    file_metrics_cache_period = os.environ.get('FILE_METRICS_CACHE_PERIOD', 3600)
+    file_metrics = None
+    if os.path.isfile(file_metrics_cache_file):
+        mod_time = os.path.getmtime(file_metrics_cache_file)
+        current_time = time.time()
+        # use cached metrics if cached file is fresh enough
+        if current_time - mod_time < file_metrics_cache_period:
+            with open(file_metrics_cache_file, 'r') as file:
+                file_metrics = json.load(file)
+                result.update(file_metrics)
+
+    if file_metrics is None:
+        if not os.path.isfile(file_metrics_cache_file):
+            with open(file_metrics_cache_file, 'w') as file:
+                json.dump({}, file) # lock file to avoid racing
+        try:
+            file_metrics = filelist_metrics(stream_file_stats())
+            result.update(file_metrics)
+            with open(file_metrics_cache_file, 'w') as file:
+                json.dump(file_metrics, file)
+            result['file_list_status_code'] = 200
+        except requests.HTTPError as http_er:
+            result['file_list_status_code'] = http_er.request.status_code
+        except Exception as general_error:
+            logger.error(general_error)
 
     # kubectl exec -it  deployment/hub -n jh-system -- bash -c
     # 'X509_USER_PROXY=/certificateservice-data/
