@@ -219,7 +219,8 @@ def refresh_oidc_token():
             with open(token_path) as f:
                 refresh_token = f.read().strip()
         else:
-            logger.error('neither DCACHE_REFRESH_TOKEN or DCACHE_REFRESH_TOKEN_FILE envs are valid')
+            logger.error(
+                'neither DCACHE_REFRESH_TOKEN or DCACHE_REFRESH_TOKEN_FILE envs are valid')
             return None
     if client_secret is None:
         secret_path = os.environ.get("DCACHE_CLIENT_SECRET_FILE")
@@ -227,7 +228,8 @@ def refresh_oidc_token():
             with open(secret_path) as f:
                 client_secret = f.read().strip()
         else:
-            logger.error('neither DCACHE_CLIENT_SECRET or DCACHE_CLIENT_SECRET_FILE envs are valid')
+            logger.error(
+                'neither DCACHE_CLIENT_SECRET or DCACHE_CLIENT_SECRET_FILE envs are valid')
             return None
     token_url = "https://keycloak.cta.cscs.ch/realms/master/protocol" \
         "/openid-connect/token"
@@ -369,8 +371,10 @@ def get_arcinfo_json(metrics=True):
     result["psn"] = len(psarc)
 
     # append file list metrics
-    file_metrics_cache_file = os.environ.get('FILE_METRICS_CACHE','/tmp/arc_file_metrics')
-    file_metrics_cache_period = os.environ.get('FILE_METRICS_CACHE_PERIOD', 3600)
+    file_metrics_cache_file = os.environ.get(
+        'FILE_METRICS_CACHE', '/tmp/arc_file_metrics')
+    file_metrics_cache_period = os.environ.get(
+        'FILE_METRICS_CACHE_PERIOD', 3600)
     file_metrics = None
     if os.path.isfile(file_metrics_cache_file):
         mod_time = os.path.getmtime(file_metrics_cache_file)
@@ -379,14 +383,12 @@ def get_arcinfo_json(metrics=True):
         if current_time - mod_time < file_metrics_cache_period:
             with open(file_metrics_cache_file, 'r') as file:
                 file_metrics = json.load(file)
-                result.update(file_metrics)
 
     if file_metrics is None:
         with open(file_metrics_cache_file, 'w') as file:
-                json.dump({}, file) # lock file to avoid racing
+            json.dump({}, file)  # lock file to avoid racing
         try:
             file_metrics = filelist_metrics(stream_file_stats())
-            result.update(file_metrics)
             with open(file_metrics_cache_file, 'w') as file:
                 json.dump(file_metrics, file)
             result['file_list_status_code'] = 200
@@ -420,10 +422,16 @@ def get_arcinfo_json(metrics=True):
                 continue
 
             r.append(f'arcservice_{k}{{label="arc"}} {v}')
+        if file_metrics is not None:
+            for label, m in file_metrics.items():
+                for k, v in m.items():
+                    r.append(f'arcservice_{k}{{label={label}}} {v}')
 
         return "\n".join(r)
 
     else:
+        if file_metrics is not None:
+            result.update(file_metrics)
         return flatten_dict(result)
 
     # arcinfo = dict(
