@@ -2,6 +2,8 @@ from contextlib import contextmanager
 import json
 import os
 import re
+from logging import raiseExceptions
+
 import requests
 import secrets
 import stat
@@ -284,10 +286,20 @@ def stream_file_stats(cert_file=None):
             yield line.decode("utf-8")
 
 
-def filelist_metrics(lines, last_period_h=24):
+def filelist_metrics(lines,
+                     default_path_prefix='/pnfs/cta.cscs.ch/',
+                     default_last_period_h=24,
+                     default_min_report_size=1000000000):
+    min_report_size = os.environ.get('ARCSERVICE_FILE_REPORT_MIN_SIZE',
+                                     default_min_report_size)
+    last_period_h = os.environ.get('ARCSERVICE_FILE_REPORT_LAST_PERIOD',
+                                   default_last_period_h)
+    path_prefix = os.environ.get('ARCSERVICE_FILE_REPORT_PATH_PREFIX',
+                                 default_path_prefix)
+
     metrics = defaultdict(lambda: defaultdict(int))
-    path_prefix = '/pnfs/cta.cscs.ch/'
-    path_groups = ['lst', 'cta', 'dteam']
+    aggregated_metrics = defaultdict(lambda: defaultdict(int))
+
     expected_header = 'isum,ipnfsid,path,isize,ictime,imtime,iatime,icrtime'
     date_format = '%Y-%m-%d %H:%M:%S'
     size_col = 3
@@ -302,13 +314,11 @@ def filelist_metrics(lines, last_period_h=24):
     for line_no, line in enumerate(lines):
         data = line.split(',')
         path = data[path_col].strip()
-        folder = 'total'
         if path.startswith(path_prefix):
-            _folder = path[len(path_prefix):].split('/')[0]
-            if _folder in path_groups:
-                folder = _folder
-
-        cur_metrics = metrics[folder]
+            folder = '/'.join(path[len(path_prefix):].split('/')[:-1])
+            cur_metrics = metrics[folder]
+        else:
+            aggregated_metrics['total']
 
         data_size = int(data[size_col])
         cur_metrics['data_size'] += data_size
@@ -326,12 +336,34 @@ def filelist_metrics(lines, last_period_h=24):
             cur_metrics['last_data_size'] += data_size
             cur_metrics['last_file_count'] += 1
 
-    tot_metrics = metrics['total']
-    for folder in path_groups:
-        for k, v in metrics[folder].items():
+    tot_metrics = aggregated_metrics['total']
+    for folder, folder_metrics in metrics.items():
+        parent_folder_names = folder.split('/')[:-1]
+        for i in range(len(parent_folder_names)):
+            folder = '/'.join(parent_folder_names[:i+1])
+            parent_metrics = aggregated_metrics[folder]
+            for k, v in folder_metrics.items():
+                parent_metrics[k] += v
+
+        for k, v in folder_metrics.items():
             tot_metrics[k] += v
 
-    return metrics
+    for path, agg_metrics in aggregated_metrics.items():
+        file_metrics = metrics.get(path, None)
+        if file_metrics:
+            for k, v in file_metrics.items():
+                agg_metrics[k] += v
+            del metrics[path]
+
+    metrics.update(aggregated_metrics)
+
+    try:
+        report_metrics = {key: value for key, value in metrics.items()
+                          if value[data_size] >= min_report_size}
+    except Exception as ex:
+        raise Exception(str(metrics.values()))
+
+    return report_metrics
 
 
 def get_arcinfo_json(metrics=True):
@@ -425,9 +457,9 @@ def get_arcinfo_json(metrics=True):
 
             r.append(f'arcservice_{k}{{label="arc"}} {v}')
         if file_metrics is not None:
-            for label, m in file_metrics.items():
+            for path, m in file_metrics.items():
                 for k, v in m.items():
-                    r.append(f'arcservice_{k}{{label={label}}} {v}')
+                    r.append(f'arcservice_dcache_{k}{{path={path}}} {v}')
 
         return "\n".join(r)
 
