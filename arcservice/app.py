@@ -357,11 +357,8 @@ def filelist_metrics(lines,
 
     metrics.update(aggregated_metrics)
 
-    try:
-        report_metrics = {key: value for key, value in metrics.items()
-                          if value[data_size] >= min_report_size}
-    except Exception as ex:
-        raise Exception(str(metrics.values()))
+    report_metrics = {key: value for key, value in metrics.items()
+                      if value['data_size'] >= min_report_size}
 
     return report_metrics
 
