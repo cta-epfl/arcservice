@@ -456,7 +456,7 @@ def get_arcinfo_json(metrics=True):
         if file_metrics is not None:
             for path, m in file_metrics.items():
                 for k, v in m.items():
-                    r.append(f'arcservice_dcache_{k}{{path={path}}} {v}')
+                    r.append(f'arcservice_dcache_{k}{{path="{path}"}} {v}')
 
         return "\n".join(r)
 
