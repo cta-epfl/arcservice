@@ -290,10 +290,10 @@ def filelist_metrics(lines,
                      default_path_prefix='/pnfs/cta.cscs.ch/',
                      default_last_period_h=24,
                      default_min_report_size=1000000000):
-    min_report_size = os.environ.get('ARCSERVICE_FILE_REPORT_MIN_SIZE',
-                                     default_min_report_size)
-    last_period_h = os.environ.get('ARCSERVICE_FILE_REPORT_LAST_PERIOD',
-                                   default_last_period_h)
+    min_report_size = int(os.environ.get('ARCSERVICE_FILE_REPORT_MIN_SIZE',
+                                     default_min_report_size))
+    last_period_h = int(os.environ.get('ARCSERVICE_FILE_REPORT_LAST_PERIOD',
+                                   default_last_period_h))
     path_prefix = os.environ.get('ARCSERVICE_FILE_REPORT_PATH_PREFIX',
                                  default_path_prefix)
 
