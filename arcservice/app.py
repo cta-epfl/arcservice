@@ -2,6 +2,8 @@ from contextlib import contextmanager
 import json
 import os
 import re
+from logging import raiseExceptions
+
 import requests
 import secrets
 import stat
@@ -12,6 +14,7 @@ from flask import Flask
 from flask_cors import CORS
 from collections import defaultdict
 from datetime import datetime, timedelta
+import time
 
 import logging
 
@@ -213,11 +216,25 @@ def refresh_oidc_token():
     client_secret = os.environ.get('DCACHE_CLIENT_SECRET', None)
     client_id = os.environ.get('DCACHE_CLIENT_ID', "dcache-cta-cscs-ch-users")
     if refresh_token is None:
-        logger.error('DCACHE_REFRESH_TOKEN env var is not set')
-        return None
+        token_path = os.environ.get("DCACHE_REFRESH_TOKEN_FILE")
+        if token_path and os.path.isfile(token_path):
+            with open(token_path) as f:
+                refresh_token = f.read().strip()
+        else:
+            logger.error(
+                "neither DCACHE_REFRESH_TOKEN or DCACHE_REFRESH_TOKEN_FILE"
+                " envs are valid")
+            return None
     if client_secret is None:
-        logger.error('DCACHE_CLIENT_SECRET env var is not set')
-        return None
+        secret_path = os.environ.get("DCACHE_CLIENT_SECRET_FILE")
+        if secret_path and os.path.isfile(secret_path):
+            with open(secret_path) as f:
+                client_secret = f.read().strip()
+        else:
+            logger.error(
+                "neither DCACHE_CLIENT_SECRET or DCACHE_CLIENT_SECRET_FILE"
+                " envs are valid")
+            return None
     token_url = "https://keycloak.cta.cscs.ch/realms/master/protocol" \
         "/openid-connect/token"
     data = {
@@ -269,10 +286,20 @@ def stream_file_stats(cert_file=None):
             yield line.decode("utf-8")
 
 
-def filelist_metrics(lines, last_period_h=24):
+def filelist_metrics(lines,
+                     default_path_prefix='/pnfs/cta.cscs.ch/',
+                     default_last_period_h=24,
+                     default_min_report_size=1000000000):
+    min_report_size = int(os.environ.get('ARCSERVICE_FILE_REPORT_MIN_SIZE',
+                                     default_min_report_size))
+    last_period_h = int(os.environ.get('ARCSERVICE_FILE_REPORT_LAST_PERIOD',
+                                   default_last_period_h))
+    path_prefix = os.environ.get('ARCSERVICE_FILE_REPORT_PATH_PREFIX',
+                                 default_path_prefix)
+
     metrics = defaultdict(lambda: defaultdict(int))
-    path_prefix = '/pnfs/cta.cscs.ch/'
-    path_groups = ['lst', 'cta', 'dteam']
+    aggregated_metrics = defaultdict(lambda: defaultdict(int))
+
     expected_header = 'isum,ipnfsid,path,isize,ictime,imtime,iatime,icrtime'
     date_format = '%Y-%m-%d %H:%M:%S'
     size_col = 3
@@ -287,13 +314,11 @@ def filelist_metrics(lines, last_period_h=24):
     for line_no, line in enumerate(lines):
         data = line.split(',')
         path = data[path_col].strip()
-        folder = 'total'
         if path.startswith(path_prefix):
-            _folder = path[len(path_prefix):].split('/')[0]
-            if _folder in path_groups:
-                folder = _folder
-
-        cur_metrics = metrics[folder]
+            folder = '/'.join(path[len(path_prefix):].split('/')[:-1])
+            cur_metrics = metrics[folder]
+        else:
+            aggregated_metrics['total']
 
         data_size = int(data[size_col])
         cur_metrics['data_size'] += data_size
@@ -311,12 +336,31 @@ def filelist_metrics(lines, last_period_h=24):
             cur_metrics['last_data_size'] += data_size
             cur_metrics['last_file_count'] += 1
 
-    tot_metrics = metrics['total']
-    for folder in path_groups:
-        for k, v in metrics[folder].items():
+    tot_metrics = aggregated_metrics['total']
+    for folder, folder_metrics in metrics.items():
+        parent_folder_names = folder.split('/')[:-1]
+        for i in range(len(parent_folder_names)):
+            folder = '/'.join(parent_folder_names[:i+1])
+            parent_metrics = aggregated_metrics[folder]
+            for k, v in folder_metrics.items():
+                parent_metrics[k] += v
+
+        for k, v in folder_metrics.items():
             tot_metrics[k] += v
 
-    return metrics
+    for path, agg_metrics in aggregated_metrics.items():
+        file_metrics = metrics.get(path, None)
+        if file_metrics:
+            for k, v in file_metrics.items():
+                agg_metrics[k] += v
+            del metrics[path]
+
+    metrics.update(aggregated_metrics)
+
+    report_metrics = {key: value for key, value in metrics.items()
+                      if value['data_size'] >= min_report_size}
+
+    return report_metrics
 
 
 def get_arcinfo_json(metrics=True):
@@ -327,9 +371,14 @@ def get_arcinfo_json(metrics=True):
 
     result = {}
 
-    arcinfo_output = subprocess.check_output(
-        ["arcinfo", "-l"], env=env).strip().decode()
-    result["info"] = parse_tabbed_output(arcinfo_output)
+    try:
+        arcinfo_output = subprocess.check_output(
+            ["arcinfo", "-l"], env=env).strip().decode()
+        result["info"] = parse_tabbed_output(arcinfo_output)
+        result['arcinfo_error'] = 0
+    except subprocess.CalledProcessError as arc_info_error:
+        result['arcinfo_error'] = arc_info_error.returncode
+        logger.error(arc_info_error)
 
     try:
         arcstat = json.loads(
@@ -353,17 +402,31 @@ def get_arcinfo_json(metrics=True):
     result["psn"] = len(psarc)
 
     # append file list metrics
-    try:
-        # cert_file = env['X509_USER_PROXY']
-        # cert_file = \
-        #   "/certificateservice-data/gitlab_ctao_volodymyr_savchenko__lst.crt"
-        lines = stream_file_stats()
-        result.update(filelist_metrics(lines))
-        result['file_list_status_code'] = 200
-    except requests.HTTPError as http_er:
-        result['file_list_status_code'] = http_er.request.status_code
-    except Exception as general_error:
-        logger.error(general_error)
+    file_metrics_cache_file = os.environ.get(
+        'FILE_METRICS_CACHE', '/tmp/arc_file_metrics')
+    file_metrics_cache_period = os.environ.get(
+        'FILE_METRICS_CACHE_PERIOD', 3600)
+    file_metrics = None
+    if os.path.isfile(file_metrics_cache_file):
+        mod_time = os.path.getmtime(file_metrics_cache_file)
+        current_time = time.time()
+        # use cached metrics if cached file is fresh enough
+        if current_time - mod_time < file_metrics_cache_period:
+            with open(file_metrics_cache_file, 'r') as file:
+                file_metrics = json.load(file)
+
+    if file_metrics is None:
+        with open(file_metrics_cache_file, 'w') as file:
+            json.dump({}, file)  # lock file to avoid racing
+        try:
+            file_metrics = filelist_metrics(stream_file_stats())
+            with open(file_metrics_cache_file, 'w') as file:
+                json.dump(file_metrics, file)
+            result['file_list_status_code'] = 200
+        except requests.HTTPError as http_er:
+            result['file_list_status_code'] = http_er.request.status_code
+        except Exception as general_error:
+            logger.error(general_error)
 
     # kubectl exec -it  deployment/hub -n jh-system -- bash -c
     # 'X509_USER_PROXY=/certificateservice-data/
@@ -390,10 +453,17 @@ def get_arcinfo_json(metrics=True):
                 continue
 
             r.append(f'arcservice_{k}{{label="arc"}} {v}')
+        if file_metrics is not None:
+            for path, m in file_metrics.items():
+                depth = len(path.split('/'))
+                for k, v in m.items():
+                    r.append(f'arcservice_dcache_{k}{{path="{path}", depth="{depth}"}} {v}')
 
         return "\n".join(r)
 
     else:
+        if file_metrics is not None:
+            result.update(file_metrics)
         return flatten_dict(result)
 
     # arcinfo = dict(
